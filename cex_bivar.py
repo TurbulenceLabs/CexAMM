@@ -22,7 +22,7 @@ class Bivar(object):
                  first_interval=15.0, second_interval=3600.0,  # 15s, 1 hour
                  first_step=0.01, second_step=0.0,
                  second_order_depth=5,
-                 symbol_name='ETH',
+                 symbol_name='GRIN',
                  ) -> None:
         super().__init__()
 
@@ -45,7 +45,7 @@ class Bivar(object):
         self.account = self.check_account()
         assert len(self.account) == 2, 'Only support 2 assets'
 
-        # order Book
+        # order book
         self.ratio = 0.0
         self.ratio_ab = ratio_ab
         self.order_book_queue = Queue()  # (symbol, side, price, quantity)
@@ -65,7 +65,6 @@ class Bivar(object):
         self.second_total_orders = 0
 
         # base price
-
         self.second_fresh_base()
 
     @retry(retry_on_exception=retry_if_not_interrupt)
@@ -82,8 +81,6 @@ class Bivar(object):
     def _hbtc_post_func(self, url, headers={}, params={}):
         # avoid error code -1121
         req = requests.post(url, headers=headers, params=params).json()
-        # if req['code'] == -1021:
-        #     raise ValueError
         return req
 
     def _query_broker(self, symbol_name):
@@ -230,7 +227,6 @@ class Bivar(object):
             'quantity': round(quantity, self.symbol_info['quantityPrecision']),
             'timeInForce': 'GTC',
             'timestamp': self.timestamp,
-            # 'recvWindow': 1,
         }
         params['signature'] = self._get_signature_sha256(params)
         req = self._hbtc_post_func(url, self.headers, params)
@@ -285,15 +281,9 @@ class Bivar(object):
         self.delete_orders(orders)
 
     def _second_lambda_build(self):
-        # quantity ratio, higher : lower
-        # qr = {
-        #     'SELL': lambda price: price / ((1 + self.second_step) * price + self.ratio_ab * self.second_step),
-        #     'BUY': lambda price: price * (1 + self.second_step) / (price - self.ratio_ab * self.second_step)
-        # }
-
         # bp: base price, bq: base_quantity
         self.new_price = lambda bp, j, step: round(bp * pow(1 + step, j), self.symbol_info['pricePrecision'])
-        # rate: BAT / (BAT + USDT)
+        # rate: a coin / (a coin + USDT)
         self.delta_qty = lambda bq, step, rate, j: round(
             bq * pow(1 + step * rate, j - 1) * step * rate * (1 - rate) / pow(1 + step, j),
             self.symbol_info['quantityPrecision'])
@@ -335,7 +325,7 @@ class Bivar(object):
         if len(history_orders) == len(self.second_idx_list):
             return list()
         history_prices = sorted([float(order['price']) for order in history_orders])
-
+        
         # Find index of completed order
         complete_order_idxes = list()
         for idx, prc_idx in enumerate(self.second_idx_list):
@@ -397,12 +387,12 @@ if __name__ == '__main__':
 
     # Initiate monitor
     bivar = Bivar(api_key=api_key, secret_key=secret_key,
-                     ratio_ab=ratio_ab,
-                     first_interval=first_interval, second_interval=second_interval,
-                     first_step=first_step, second_step=second_step,
-                     second_order_depth=second_order_depth,
-                     symbol_name=symbol_name,
-                     )
+                  ratio_ab=ratio_ab,
+                  first_interval=first_interval, second_interval=second_interval,
+                  first_step=first_step, second_step=second_step,
+                  second_order_depth=second_order_depth,
+                  symbol_name=symbol_name,
+                  )
     if bivar.total_assets < 500:
         print("Charge some USDT! BABY!!")
         exit(-1)
