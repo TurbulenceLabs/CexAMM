@@ -1,12 +1,6 @@
-import os
 import sys
-import hmac
 import time
-import hashlib
-import requests
 from queue import Queue
-from retrying import retry
-from datetime import datetime
 
 from cex_model import AMM_Model
 
@@ -118,7 +112,7 @@ class Bivar(AMM_Model):
         for item in operation_assets:
             self.order_book_queue.put((self.symbol, side, price, item / price))
 
-        print(f'Step 1...............${self.total_assets}, ratio: {self.ratio}, order: {(len(operation_assets))}')
+        self.print_log_message(f'Step 1: ${self.total_assets}, ratio: {self.ratio}, order: {(len(operation_assets))}')
         self._make_order(self.order_book_queue)
 
     def _second_delete_orders(self, price_idxes):
@@ -209,14 +203,13 @@ class Bivar(AMM_Model):
             new_order_idxes = sorted(list(set(order_idxes) - cur_orders), reverse=True)
             delete_order_idxes = sorted(list(cur_orders - set(order_idxes)), reverse=True)
             self.second_idx_list = order_idxes
-        print(f'Step 2...............${self.total_assets}, ratio: {self.ratio} order: {len(self.second_idx_list)}')
+        self.print_log_message(f'Step 2: ${self.total_assets}, ratio: {self.ratio} order: {len(self.second_idx_list)}')
         self._second_delete_orders(delete_order_idxes)
         self._second_make_orders(new_order_idxes)
         self.second_total_orders += len(new_order_idxes)
 
 
 if __name__ == '__main__':
-    print(f'CexAMM is standing by!!!!!!!!')
     # params
     api_key, secret_key = sys.argv[1], sys.argv[2]
     # ------------------------- Manual Parameters ---------------------------
@@ -239,15 +232,15 @@ if __name__ == '__main__':
                   second_order_depth=second_order_depth,
                   symbol_name=symbol_name,
                   )
+    bivar.print_info_message(f'CexAMM is standing by!!!!!!!!')
 
     # AMM condition
     if bivar.total_assets < 500:
-        print("Charge some USDT! BABY!!")
-        exit(-1)
+        bivar.print_error_message("Charge some USDT! BABY!!")
 
     bivar.ratio = bivar.update_ratio()
     orders = bivar.query_now_orders()
-    print(f'CexAMM is completed!!!!!!!! ----- ${bivar.total_assets}, ratio: {bivar.ratio}, order: {len(orders)}')
+    bivar.print_log_message(f'CexAMM is completed! ${bivar.total_assets}, ratio: {bivar.ratio}, order: {len(orders)}')
 
     # restart step2
     if abs(bivar.ratio_ab - bivar.ratio) < balance_ratio_condition:

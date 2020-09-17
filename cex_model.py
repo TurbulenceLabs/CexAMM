@@ -1,10 +1,8 @@
 import os
-import sys
 import hmac
 import time
 import hashlib
 import requests
-from queue import Queue
 from retrying import retry
 from datetime import datetime
 
@@ -41,6 +39,16 @@ class AMM_Model(object):
             'openOrders': os.path.join(host, 'v1/openOrders'),
             'price': os.path.join(host, 'quote/v1/ticker/price'),
             'withdrawalOrders': os.path.join(host, 'v1/withdrawalOrders'),
+        }
+
+        # print parameters
+        self.self.text_colors = {
+            'logs': '\033[34m',  # 033 is the escape code and 34 is the color code
+            'info': '\033[32m',
+            'warning': '\033[33m',
+            'error': '\033[31m',
+            'bold': '\033[1m',
+            'end_color': '\033[0m'
         }
 
     @retry(retry_on_exception=retry_if_not_interrupt)
@@ -181,3 +189,30 @@ class AMM_Model(object):
             params = {'orderId': order['orderId']}
             req = self._hbtc_delete_func(self.urls['order'], self.headers, self._get_params(params))
             print(req)
+
+    # -------------------- print functions --------------------
+    def _get_curr_time_stamp(self):
+        return time.strftime("%Y-%m-%d %H:%M:%S")
+
+    def print_error_message(self, message):
+        time_stamp = self._get_curr_time_stamp()
+        error_str = self.self.text_colors['error'] + self.self.text_colors['bold'] + 'ERROR  ' + self.self.text_colors[
+            'end_color']
+        print('{} - {} - {}'.format(time_stamp, error_str, message))
+        print('{} - {} - {}'.format(time_stamp, error_str, 'Exiting!!!'))
+        exit(-1)
+
+    def print_log_message(self, message):
+        time_stamp = self._get_curr_time_stamp()
+        log_str = self.text_colors['logs'] + self.text_colors['bold'] + 'LOGS   ' + self.text_colors['end_color']
+        print('{} - {} - {}'.format(time_stamp, log_str, message))
+
+    def print_warning_message(self, message):
+        time_stamp = self._get_curr_time_stamp()
+        warn_str = self.text_colors['warning'] + self.text_colors['bold'] + 'WARNING' + self.text_colors['end_color']
+        print('{} - {} - {}'.format(time_stamp, warn_str, message))
+
+    def print_info_message(self, message):
+        time_stamp = self._get_curr_time_stamp()
+        info_str = self.text_colors['info'] + self.text_colors['bold'] + 'INFO   ' + self.text_colors['end_color']
+        print('{} - {} - {}'.format(time_stamp, info_str, message))
