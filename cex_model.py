@@ -70,37 +70,65 @@ class AMM_Model(object):
         depth = self._hbtc_get_func(self.urls['depth'], params=params)
         return depth
 
-    def _query_broker(self, symbol_name):
-        symbols = self._hbtc_get_func(self.urls['brokerInfo'], params={'type': 'token'})['symbols']
+    def _normalize_shares(self, shares: dict):
+        sums = sum([item for item in shares.values()])
+        for key, value in sums:
+            shares[key] = value / sums
+        return shares
+
+    def _get_price(self, pair: str):
+        info = self._hbtc_get_func(self.urls['price'], params={'symbol': pair.upper()})
+        return float(info['price']) if info.get('code') is None else -1
+
+    def _check_pair(self, pair):
+        if isinstance(pair, str):
+            assert self._get_price(pair) != -1, f'Can\'t find {pair} exchange pair'
+            return pair
+        elif isinstance(pair, list):
+            for item in pair:
+                assert self._get_price(item) != -1, f'Can\'t find {item} exchange pair'
+            return pair
+        elif isinstance(pair, dict):
+            for item in pair.values():
+                assert self._get_price(item) != -1, f'Can\'t find {item} exchange pair'
+            return pair
+        else:
+            raise ValueError('Wrong type of pair')
+
+    def _query_broker(self, token_name):
         symbol = dict()
-        for item in symbols:
-            if item['symbol'] == symbol_name:
+        token_name = token_name.upper()
+        for item in (self._hbtc_get_func(self.urls['brokerInfo'], params={'type': 'token'})['symbols']):
+            if item['symbol'] == token_name:
                 symbol['minPrice'] = float(item['filters'][0]['minPrice'])
                 symbol['maxPrice'] = float(item['filters'][0]['maxPrice'])
                 symbol['pricePrecision'] = len(item['filters'][0]['tickSize'].split('.')[1])
                 symbol['minQty'] = float(item['filters'][1]['minQty'])
                 symbol['maxQty'] = float(item['filters'][1]['maxQty'])
                 symbol['quantityPrecision'] = len(item['filters'][1]['stepSize'].split('.')[1])
-                return symbol
+                break
+        return symbol
+
+    def _check_token(self, token_name):
+        token_names = [token_name] if isinstance(token_name, str) else token_name
+        for item in token_names:
+            assert len(self._query_broker(item)) != 0, f'Can\'t find {item}'
+        return token_name
 
     def _order_temp(self, symbol, side, price, quantity):
-        params = {
-            'symbol': symbol,
+        params = self._get_params({
             'side': side,
             'type': 'LIMIT',
+            'symbol': symbol,
+            'timeInForce': 'GTC',
             'price': round(price, self.symbol_info['pricePrecision']),
             'quantity': round(quantity, self.symbol_info['quantityPrecision']),
-            'timeInForce': 'GTC',
-            'timestamp': self.timestamp,
-        }
-        params['signature'] = self._get_signature_sha256(params)
+        })
         req = self._hbtc_post_func(self.urls['order'], self.headers, params)
         return req
 
-    def _get_params(self, ps={}):
-        params = {'timestamp': self.timestamp}
-        for key, value in ps.items():
-            params[key] = value
+    def _get_params(self, params={}):
+        params['timestamp'] = self.timestamp
         params['signature'] = self._get_signature_sha256(params)
         return params
 
@@ -150,6 +178,6 @@ class AMM_Model(object):
 
     def delete_orders(self, orders):
         for order in orders:
-            ps = {'orderId': order['orderId']}
-            req = self._hbtc_delete_func(self.urls['order'], self.headers, self._get_params(ps))
+            params = {'orderId': order['orderId']}
+            req = self._hbtc_delete_func(self.urls['order'], self.headers, self._get_params(params))
             print(req)
