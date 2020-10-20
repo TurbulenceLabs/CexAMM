@@ -19,11 +19,12 @@ class Bivar(AMM_Model):
         self.symbol_info = self._query_broker(self.symbol)
 
         self.account = self.check_account()
-        assert len(self.account) == 2, 'Only support 2 assets'
+        if len(self.account) != 2:
+            self.print_error_message('This procedure only support 2 assets')
 
         self.ratio = 0.0
         self.shares = self._normalize_shares(shares)
-        self.ratio_ab = self.shares[symbol_name] / self.shares['USDT']
+        self.ratio_ab = self.shares[self.symbol_name] / self.shares['USDT']
         self.order_book_queue = Queue()  # (symbol, side, price, quantity)
 
         self.first_step = first_step
@@ -57,14 +58,8 @@ class Bivar(AMM_Model):
                 assets[1] = item
 
         if len(assets[1]) == 1:
-            assets[1] = {
-                'asset': 'USDT',
-                'assetId': 'USDT',
-                'assetName': 'USDT',
-                'total': '0.0',
-                'free': '0.0',
-                'locked': '0',
-            }
+            assets[1] = {'asset': 'USDT', 'assetId': 'USDT', 'assetName': 'USDT',
+                         'total': '0', 'free': '0', 'locked': '0'}
 
         for asset in assets:
             asset['total_usdt_price'] = str(float(asset['total']) * self._get_price_usdt(asset['assetName']))
@@ -129,9 +124,11 @@ class Bivar(AMM_Model):
         # bp: base price, bq: base_quantity
         self.new_price = lambda bp, j, step: round(bp * pow(1 + step, j), self.symbol_info['pricePrecision'])
         # rate: a token / (a token + USDT)
-        self.delta_qty = lambda bq, step, rate, j: round(
-            bq * pow(1 + step * rate, j - 1) * step * rate * (1 - rate) / pow(1 + step, j),
-            self.symbol_info['quantityPrecision'])
+        # self.delta_qty = lambda bq, step, rate, j: round(
+        #     bq * pow(1 + step * rate, j - 1) * step * rate * (1 - rate) / pow(1 + step, j),
+        #     self.symbol_info['quantityPrecision'])
+        self.delta_qty = lambda bq, step, ratio_ab, j: round(abs(pow(1 + step, j) - 1) * bq / (1 + ratio_ab),
+                                                             self.symbol_info['quantityPrecision'])
 
     def _second_make_orders(self, price_idxes):
         sides, prices, delta_qties = self._second_price_idx2info(price_idxes)
@@ -145,8 +142,8 @@ class Bivar(AMM_Model):
         for price_idx in price_idxes:
             side = 'SELL' if price_idx > (sum(self.second_idx_list) / len(self.second_idx_list)) else 'BUY'
             price = self.new_price(self.second_base_price, price_idx, self.second_step)
-            delta_qty = self.delta_qty(self.second_base_qty, self.second_step, self.ratio_ab / (1 + self.ratio_ab),
-                                       price_idx)
+            # delta_qty = self.delta_qty(self.second_base_qty, self.second_step, self.ratio_ab / (1 + self.ratio_ab),
+            #                            price_idx)
             sides.append(side)
             prices.append(price)
             delta_qtys.append(delta_qty)
