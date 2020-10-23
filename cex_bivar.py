@@ -142,8 +142,7 @@ class Bivar(AMM_Model):
         for price_idx in price_idxes:
             side = 'SELL' if price_idx > (sum(self.second_idx_list) / len(self.second_idx_list)) else 'BUY'
             price = self.new_price(self.second_base_price, price_idx, self.second_step)
-            # delta_qty = self.delta_qty(self.second_base_qty, self.second_step, self.ratio_ab / (1 + self.ratio_ab),
-            #                            price_idx)
+            delta_qty = self.delta_qty(self.second_base_qty, self.second_step, self.ratio_ab, price_idx)
             sides.append(side)
             prices.append(price)
             delta_qtys.append(delta_qty)
